@@ -101,11 +101,11 @@ for train_index, test_index in kfold.split(x_train):
     reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=7, factor=0.5, verbose=1)
 
     model.compile(loss='mse', optimizer=tf.keras.optimizers.Adam(lr=0.002), metrics='mae')
-    model.fit(x_train1, y_train1, epochs=100, batch_size=150, validation_data=(x_val,y_val), callbacks=[es,reduce_lr, mc] )
+    model.fit(x_train1, y_train1, epochs=100, batch_size=200, validation_data=(x_val,y_val), callbacks=[es,reduce_lr, mc] )
 
     # 4. 평가, 예측
 
-    loss, mae = model.evaluate(x_test1, y_test1, batch_size=150)
+    loss, mae = model.evaluate(x_test1, y_test1, batch_size=200)
     y_predict = model.predict(x_pred)
 
     # RMSE 
