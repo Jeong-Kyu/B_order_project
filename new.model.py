@@ -1,3 +1,4 @@
+import imp
 import numpy as np
 import db_connect as db
 import pandas as pd
@@ -23,52 +24,45 @@ DAYOFWEEK (DATE)AS DAY, a.time, s.index AS category, d.index AS dong, a.value FR
 '''
 
 # 0 있다
-query = "select * from main_data_table ORDER BY DATE, YEAR, MONTH ,TIME, category ASC"
-
+query = "SELECT * FROM main_data_table WHERE (TIME != 2 AND TIME != 3 AND TIME != 4 AND TIME != 5  AND TIME != 6 AND TIME != 7 AND TIME != 8) ORDER BY DATE, YEAR, MONTH ,TIME, category ASC  "
+query1 = "select * from main_data_table ORDER BY DATE, YEAR, MONTH ,TIME, category ASC"
 db.cur.execute(query)
 dataset = np.array(db.cur.fetchall())
-
+db.cur.execute(query1)
+dataset1 = np.array(db.cur.fetchall())
 
 # pandas 넣기
 
 column_name = ['date', 'year', 'month', 'day', 'time', 'category', 'dong', 'value']
 
 df = pd.DataFrame(dataset, columns=column_name)
+df1 = pd.DataFrame(dataset1, columns=column_name)
 
 db.connect.commit()
 
-# train, test 나누기
-# 원 핫으로 컬럼 추가해주는 코드!!!!!
-df = pd.get_dummies(df, columns=["category", "dong"])
-# 카테고리랑 동만 원핫으로 해준다 
-
-# df.fit_transform(X, y)
-
-# train, test 나누기
-
 train_value = df[ '2020-09-01' > df['date'] ]
 
-x_train = train_value.iloc[:,1:-1].astype('int64').to_numpy()
-y_train = train_value.iloc[:,-1].astype('int64').to_numpy()
+x_train = train_value.iloc[:,1:-1].astype('int64')
+y_train = train_value['value'].astype('int64').to_numpy()
 
-# x_train = x_train.reshape(x_train.shape[0], x_train.shape[1],1,1)
+test_value = df1[df1['date'] >=  '2020-09-01']
 
-test_value = df[df['date'] >=  '2020-09-01']
+x_pred = test_value.iloc[:,1:-1].astype('int64')
+y_pred = test_value['value'].astype('int64').to_numpy()
 
-x_pred = test_value.iloc[:,1:-1].astype('int64').to_numpy()
-y_pred = test_value.iloc[:,-1].astype('int64').to_numpy()
+x_train = pd.get_dummies(x_train, columns=["category", "dong"]).to_numpy()
+x_pred = pd.get_dummies(x_pred, columns=["category", "dong"]).to_numpy()
 
-# x_pred = x_pred.reshape(x_pred.shape[0], x_pred.shape[1],1,1)
 
-np.save("C:/data/npy/order_x_train.npy", arr=x_train)
-np.save("C:/data/npy/order_y_train.npy", arr=y_train)
-np.save("C:/data/npy/order_x_pred.npy", arr=x_pred)
-np.save("C:/data/npy/order_y_pred.npy", arr=y_pred)
+np.save("C:/data/npy/p0_order_x_train.npy", arr=x_train)
+np.save("C:/data/npy/p0_order_y_train.npy", arr=y_train)
+np.save("C:/data/npy/p0_order_x_pred.npy", arr=x_pred)
+np.save("C:/data/npy/p0_order_y_pred.npy", arr=y_pred)
 
-x_train = np.load("C:/data/npy/order_x_train.npy",allow_pickle=True)
-y_train = np.load("C:/data/npy/order_y_train.npy",allow_pickle=True)
-x_pred = np.load("C:/data/npy/order_x_pred.npy",allow_pickle=True)
-y_pred = np.load("C:/data/npy/order_y_pred.npy",allow_pickle=True)
+x_train = np.load("C:/data/npy/p0_order_x_train.npy",allow_pickle=True)
+y_train = np.load("C:/data/npy/p0_order_y_train.npy",allow_pickle=True)
+x_pred = np.load("C:/data/npy/p0_order_x_pred.npy",allow_pickle=True)
+y_pred = np.load("C:/data/npy/p0_order_y_pred.npy",allow_pickle=True)
 
 
 def RMSE(y_test, y_predict): 
@@ -78,29 +72,32 @@ x_train, x_val, y_train, y_val = train_test_split(x_train, y_train,  train_size=
 # x_train = x_train.reshape(38833, 38, 28, 3)
 print(x_train.shape, x_val.shape, x_pred.shape) # (3124915, 42) (347213, 42) (177408, 42)
 
-inputs = Input(shape=(x_train.shape[1]),name='input')
-x = Dense(1024,activation=acti)(inputs)
-x = Dropout(0.2)(x)
-x = Dense(256,activation=acti)(x)
-x = Dropout(0.2)(x)
-x = Dense(64,activation=acti)(x)
-x = Dense(16,activation=acti)(x)
-outputs = Dense(1)(x)
+leaky_relu = tf.nn.leaky_relu
 
+inputs = Input(shape=(x_train.shape[1]),name='input')
+x = Dense(1024,activation=leaky_relu)(inputs)
+x = Dropout(0.2)(x)
+x = Dense(256,activation=leaky_relu)(x)
+x = Dropout(0.2)(x)
+x = Dense(64,activation=leaky_relu)(x)
+x = Dense(16,activation=leaky_relu)(x)
+outputs = Dense(1)(x)
 model = Model(inputs=inputs, outputs=outputs)
 model.summary()
 
 
-# es= EarlyStopping(monitor='val_loss', patience=10)
+es= EarlyStopping(monitor='val_loss', patience=10)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', patience=5, factor=0.5, verbose=1)
-# cp = ModelCheckpoint(filepath=modelpath, monitor='val_loss', save_best_only=True, mode='auto')
-cp = ModelCheckpoint('../data/h5/effiB2__dense_1.hdf5', monitor='val_loss', save_best_only=True, verbose=1,mode='auto')
-model.compile(loss='mse', optimizer='adam', metrics='mae')
-model.fit(x_train, y_train, epochs=10, batch_size=512, validation_data=(x_val,y_val), callbacks=[reduce_lr,cp] )
+cp = ModelCheckpoint('../data/h5/p0_dense_1.hdf5', monitor='val_loss', save_best_only=True, verbose=1,mode='auto')
+model.compile(loss='mse', optimizer='adamax', metrics='mae')
+model.fit(x_train, y_train, epochs=50, batch_size=1024, validation_data=(x_val,y_val), callbacks=[reduce_lr,cp] )
+
+from tensorflow.keras.models import load_model
+model = load_model('../data/h5/p0_dense_1.hdf5', custom_objects={'leaky_relu': tf.nn.leaky_relu})
 
 # 4. 평가, 예측
 
-loss, mae = model.evaluate(x_pred, y_pred, batch_size=512)
+loss, mae = model.evaluate(x_pred, y_pred, batch_size=1024)
 y_predict = model.predict(x_pred)
 
 # RMSE 
@@ -109,3 +106,12 @@ print("RMSE : ", RMSE(y_pred, y_predict))
 # R2 만드는 법
 r2 = r2_score(y_pred, y_predict)
 print("R2 : ", r2)
+
+import matplotlib.pyplot as plt
+ 
+fig = plt.figure( figsize = (12, 4))
+chart = fig.add_subplot(1,1,1)
+chart.plot(y_pred, marker='o', color='blue', label='실제값')
+chart.plot(y_predict, marker='^', color='red', label='예측값')
+plt.legend(loc = 'best') 
+plt.show()
