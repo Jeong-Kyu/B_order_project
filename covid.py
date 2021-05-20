@@ -38,14 +38,17 @@ def callbacks(modelpath):
 def build_model(acti, opti, lr):   
 
     # 2. 모델구성
-    inputs = Input(shape = (x_train.shape[1],1,1),name = 'input')
-    # 모델2
-    x = Conv2D(filters=32,kernel_size=(2,2),padding='same',strides = (2,2), activation=acti)(inputs)
-    x = BatchNormalization()(x)
+    
+    inputs = Input(shape=(x_train.shape[1],1,1),name='input')
+
+    x = Conv2D(filters=32,kernel_size=2,padding='same',strides = 2, activation='tanh')(inputs)
     x = Flatten()(x)
-    x = Dense(32, activation=acti)(x)
-    x = Dense(16, activation=acti)(x)
-    x = Dense(8, activation=acti)(x)
+    x = Dense(32,activation="relu")(x)
+    x = Dense(32,activation="relu")(x)
+    x = Dense(32,activation="relu")(x)
+    x = Dense(16,activation="relu")(x)
+    x = Dense(16,activation="relu")(x)
+
     outputs = Dense(1)(x)
     model = Model(inputs=inputs,outputs=outputs)
 
@@ -87,7 +90,7 @@ def load_data(query, is_train = True):
     dataset = np.array(db.cur.fetchall())
 
     # pandas 넣기
-    column_name = ['date', 'year', 'month', 'day', 'time', 'category', 'dong','temperature','rain','wind','humidity', 'value']
+    column_name = ['date', 'year', 'month', 'day', 'time', 'category', 'dong','temperature','rain','wind','humidity','person', 'value']
     df = pd.DataFrame(dataset, columns=column_name)
     db.connect.commit()
 
@@ -110,21 +113,11 @@ def load_data(query, is_train = True):
 
     return x, y
 
-# x_pred, y_pred = load_data("SELECT d.date,YEAR,MONTH, d.day, d.time, category, dong,temperature,rain,wind,humidity,VALUE FROM main_data_table AS d INNER JOIN `weather` AS s ON d.date = s.DATE AND d.time = s.time", is_train = False)
-# x_train, y_train = load_data("SELECT d.date,YEAR,MONTH, d.day, d.time, category, dong,temperature,rain,wind,humidity,VALUE FROM main_data_table AS d INNER JOIN `weather` AS s ON d.date = s.DATE AND d.time = s.time WHERE (d.TIME != 2 AND d.TIME != 3 AND d.TIME != 4 AND d.TIME != 5  AND d.TIME != 6 AND d.TIME != 7 AND d.TIME != 8) ORDER BY DATE, YEAR, MONTH, DAY, TIME, category, dong ASC")
+x_pred, y_pred = load_data("SELECT d.date,YEAR,MONTH, d.day, d.time, category, dong,temperature,rain,wind,humidity, IFNULL( c_person,0) AS person, VALUE FROM main_data_table AS d INNER JOIN `weather` AS s ON d.date = s.DATE AND d.time = s.time LEFT JOIN `covid19_re` AS c ON c.date = d.date ", is_train = False)
+x_train, y_train = load_data("SELECT d.date,YEAR,MONTH, d.day, d.time, category, dong,temperature,rain,wind,humidity, IFNULL( c_person,0) AS person, VALUE FROM main_data_table AS d INNER JOIN `weather` AS s ON d.date = s.DATE AND d.time = s.time LEFT JOIN `covid19_re` AS c ON c.date = d.date WHERE (d.TIME != 2 AND d.TIME != 3 AND d.TIME != 4 AND d.TIME != 5  AND d.TIME != 6 AND d.TIME != 7 AND d.TIME != 8) ORDER BY DATE, YEAR, MONTH, DAY, TIME, category, dong ASC")
 
-# x_train = x_train.reshape(x_train.shape[0], x_train.shape[1],1,1)
-# x_pred = x_pred.reshape(x_pred.shape[0], x_pred.shape[1],1,1)
-
-# np.save("C:/data/0515_order_x_train.npy", arr=x_train)
-# np.save("C:/data/0515_order_y_train.npy", arr=y_train)
-# np.save("C:/data/0515_order_x_pred.npy", arr=x_pred)
-# np.save("C:/data/0515_order_y_pred.npy", arr=y_pred)
-
-x_train = np.load("C:/data/0515_order_x_train.npy",allow_pickle=True)
-y_train = np.load("C:/data/0515_order_y_train.npy",allow_pickle=True)
-x_pred = np.load("C:/data/0515_order_x_pred.npy",allow_pickle=True)
-y_pred = np.load("C:/data/0515_order_y_pred.npy",allow_pickle=True)
+x_train = x_train.reshape(x_train.shape[0], x_train.shape[1],1,1)
+x_pred = x_pred.reshape(x_pred.shape[0], x_pred.shape[1],1,1)
 
 x_train, x_val, y_train, y_val = train_test_split(x_train, y_train,  train_size=0.9, random_state = 77, shuffle=True ) 
 
@@ -135,26 +128,26 @@ print(x_val.shape, y_val.shape)     #(245943, 46, 1) (245943,)
 leaky_relu = tf.nn.leaky_relu
 acti_list = [leaky_relu, mish, 'swish', 'elu', 'relu', 'selu','tanh']
 opti_list = [RMSprop, Nadam, Adam, Adadelta, Adamax, Adagrad]
-batch = 1024
+batch = 1
 lrr = 0.001
-epo = 50
+epo = 5000
 for op_idx,opti in enumerate(opti_list):
     for ac_idx,acti in enumerate(acti_list):
-        modelpath = f'../data/mitzy/modelcheckpoint/21_weather_data_conv1d_{op_idx}_{ac_idx}.hdf5'
-        # model = build_model(acti, opti, lrr)
-        model = load_model(modelpath, custom_objects={'leaky_relu':tf.nn.leaky_relu, 'mish':mish})
+        modelpath = f'../data/modelcheckpoint/20_models_covid_conv2d_{op_idx}_{ac_idx}.hdf5'
+        model = build_model(acti, opti, lrr)
+        # model = load_model(modelpath, custom_objects={'leaky_relu':tf.nn.leaky_relu, 'mish':mish})
 
         # 훈련
-        # er,mo,lr = callbacks(modelpath) 
-        # history = model.fit(x_train, y_train, verbose=1, batch_size=batch, epochs = epo, validation_data=(x_val,y_val), callbacks = [er, lr, mo])
+        er,mo,lr = callbacks(modelpath) 
+        history = model.fit(x_train, y_train, verbose=1, batch_size=batch, epochs = epo, validation_data=(x_val,y_val), callbacks = [er, lr, mo])
         # history_list.append(history)
 
         score, y_predict = evaluate_list(model)
         # 엑셀 추가 코드 
         # 경로 변경 필요!!!!
-        # df = pd.DataFrame(y_pred)
-        # df[f'{op_idx}_{ac_idx}'] = y_predict
-        # df.to_csv(f'./mitzy/21_weather_data_conv1d_{op_idx}_{ac_idx}.csv',index=False)
+        df = pd.DataFrame(y_pred)
+        df[f'{op_idx}_{ac_idx}'] = y_predict
+        df.to_csv(f'../data/modelcheckpoint/20_models_covid_conv2d_{op_idx}_{ac_idx}.csv',index=False)
 
         fold_score_list.append(score)
         print('=============parameter=================')
@@ -173,3 +166,14 @@ print('=========================final score========================')
 print("r2           rmse          mae            mse: ")
 fold_score_list = np.array(fold_score_list).reshape(len(opti_list),len(acti_list),4)
 print(fold_score_list)
+'''
+optimizer :  <class 'tensorflow.python.keras.optimizer_v2.rmsprop.RMSprop'> 
+ activation :  tanh
+ batch_size :  500
+ lr :  0.001
+ epochs :  5000
+r2   :  0.858529394567721
+rmse :  1.459906920570742
+mae :  0.3961494602692392
+mse :  2.131328216730347
+'''
