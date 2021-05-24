@@ -128,7 +128,7 @@ print(x_val.shape, y_val.shape)     #(245943, 46, 1) (245943,)
 leaky_relu = tf.nn.leaky_relu
 acti_list = [leaky_relu, mish, 'swish', 'elu', 'relu', 'selu','tanh']
 opti_list = [RMSprop, Nadam, Adam, Adadelta, Adamax, Adagrad]
-batch = 1
+batch = 1024
 lrr = 0.001
 epo = 5000
 for op_idx,opti in enumerate(opti_list):
