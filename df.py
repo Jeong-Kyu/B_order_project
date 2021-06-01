@@ -1,1 +1,0 @@
-a,b = input("두개").split()
