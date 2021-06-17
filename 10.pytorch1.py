@@ -112,19 +112,15 @@ class MLPRegressor(nn.Module):
         
     def forward(self, x):
         o = self.hidden(x)
-        return o.view(-1)
+        return o
 
 #Train model
 model = MLPRegressor()
-
 criterion = nn.MSELoss()
 learning_rate = 1e-3
 optimizer = optim.Adam(model.parameters(), lr=learning_rate)
-
 num_epochs = 10
 num_batches = len(trn_loader)
-
-print(num_batches)  #38429
 
 trn_loss_list = []
 val_loss_list = []
@@ -136,8 +132,7 @@ for epoch in range(num_epochs):
         if use_cuda:
             trn_X, trn_y = trn_X.cuda(), trn_y.cuda()
         optimizer.zero_grad()
-        trn_pred = model(trn_X.float()) #HERE: why is .float() needed here?
-        # https://discuss.pytorch.org/t/pytorch-why-is-float-needed-here-for-runtimeerror-expected-scalar-type-float-but-found-double/98741
+        trn_pred = model(trn_X.float())
         trn_loss = criterion(trn_pred.float(), trn_y.float())
         trn_loss.backward()
         optimizer.step()
